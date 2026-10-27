@@ -2,7 +2,9 @@
 // Env vars (Netlify > Site configuration > Environment variables):
 //   AIRTABLE_TOKEN    personal access token (data.records:read + data.records:write on the base)
 //   AIRTABLE_BASE_ID  appXXXXXXXXXXXXXX
-//   ADMIN_KEY         any passphrase; the site asks for it once per device
+//   ADMIN_KEY         passphrase (12+ characters). Each device enters it once and gets its own signed
+//                     device token; the key itself is never stored on devices. Changing ADMIN_KEY
+//                     signs out every device.
 const crypto = require('crypto');
 
 const BASE = process.env.AIRTABLE_BASE_ID;
@@ -207,6 +209,26 @@ const ops = {
   },
 };
 
+// ---------- Device tokens ----------
+const TOKEN_DAYS = 365;
+const b64 = buf => Buffer.from(buf).toString('base64url');
+const sign = payload => crypto.createHmac('sha256', 'device-token:' + ADMIN_KEY).update(payload).digest('base64url');
+const safeEq = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+function issueToken(device) {
+  const payload = b64(JSON.stringify({ d: String(device || 'device').slice(0, 60), iat: Date.now(), n: crypto.randomBytes(6).toString('hex') }));
+  return payload + '.' + sign(payload);
+}
+function verifyToken(token) {
+  const [payload, mac] = String(token || '').split('.');
+  if (!payload || !mac || !safeEq(mac, sign(payload))) return false;
+  try { const d = JSON.parse(Buffer.from(payload, 'base64url').toString()); return Date.now() - d.iat < TOKEN_DAYS * 86400000; }
+  catch (e) { return false; }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 const json = (statusCode, body) => ({
   statusCode,
   headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
@@ -216,9 +238,15 @@ const json = (statusCode, body) => ({
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Use POST' });
   if (!BASE || !TOKEN) return json(500, { error: 'Server is missing AIRTABLE_TOKEN or AIRTABLE_BASE_ID' });
-  if (ADMIN_KEY && (event.headers['x-admin-key'] || '') !== ADMIN_KEY) return json(401, { error: 'Access key required' });
+  // Fail closed: no key configured means nobody gets in.
+  if (!ADMIN_KEY || ADMIN_KEY.length < 12) return json(500, { error: 'Admin is locked: set ADMIN_KEY (12+ characters) in Netlify and redeploy' });
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch (e) { return json(400, { error: 'Bad JSON' }); }
+  if (body.op === 'login') {
+    if (!safeEq(body.key || '', ADMIN_KEY)) { await sleep(1200); return json(401, { error: 'Wrong access key' }); }
+    return json(200, { token: issueToken(body.device) });
+  }
+  if (!verifyToken(event.headers['x-device-token'])) return json(401, { error: 'This device isn’t signed in' });
   const fn = Object.prototype.hasOwnProperty.call(ops, body.op) ? ops[body.op] : null;
   if (!fn) return json(400, { error: 'Unknown op' });
   try { return json(200, await fn(body)); }
