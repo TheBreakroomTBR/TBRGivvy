@@ -118,6 +118,23 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
 .blank p{color:var(--muted)}
 .lock{max-width:420px;margin:12vh auto;text-align:center}
 .lock input{width:100%;margin:12px 0}
+.mbox.wide{width:min(860px,100%)}
+.imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0}
+.imp-grid label{display:flex;flex-direction:column;gap:4px;font-size:15px;color:var(--muted)}
+.imp-grid select,.imp-grid input{color:var(--text)}
+.imp-rule{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:4px 0 12px;color:var(--muted)}
+.imp-rule input[type=number]{width:80px;color:var(--text);font-weight:700}
+.imp-rule label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.imp-sum{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.imp-sum b{color:var(--gold)}
+.imp-skip{color:var(--muted);font-size:15px;margin-top:2px}
+.imp-table{width:100%;border-collapse:collapse;font-size:16px}
+.imp-table th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:6px 4px;position:sticky;top:0;background:var(--panel)}
+.imp-table td{padding:5px 4px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.imp-table td.n,.imp-table th.n{text-align:right}
+.imp-table td.e{color:var(--gold);font-weight:700}
+.imp-scroll{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.imp-file{width:100%;margin:10px 0}
 #printArea{display:none}
 @media print{
   @page{margin:6mm}
@@ -199,6 +216,7 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
           <textarea id="bulk" rows="5" placeholder="One per line, entries optional:&#10;jerseyking22, 3&#10;@helmethunter&#10;cardflipper 2"></textarea>
           <button class="btn" type="button" id="bulkBtn">Add list</button>
         </details>
+        <button class="btn" type="button" id="importBtn" style="margin-bottom:14px">Import orders from Excel</button>
         <input class="filter" id="filter" placeholder="Find a username" aria-label="Find a username">
         <ul class="list" id="list"></ul>
         <button class="btn ghost danger" id="clearEntries">Clear all entries</button>
@@ -516,8 +534,8 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
   // ---------- Modal ----------
   function openModal(node){ var m = $('modal'); m.innerHTML = ''; m.appendChild(node); m.classList.add('open'); }
   function closeModal(){ $('modal').classList.remove('open'); $('modal').innerHTML = ''; }
-  $('modal').addEventListener('click', function(ev){ if (ev.target === this || ev.target.closest('[data-close]')) closeModal(); });
-  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeModal(); });
+  $('modal').addEventListener('click', function(ev){ if (importing) return; if (ev.target === this || ev.target.closest('[data-close]')) closeModal(); });
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape' && !importing) closeModal(); });
   function showBig(p){
     var box = el('div', 'big-code'); box.dataset.close = '1';
     box.append(barcodeImg(p.sku, true), el('div', 'cap', p.name));
@@ -559,6 +577,222 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
       }
       draw(); openModal(box);
     }).catch(fail);
+  };
+
+  // ---------- Excel / CSV order import ----------
+  var importing = false, IMP = null, xlsxLoading = null;
+  var XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  function loadXlsx(){
+    if (window.XLSX) return Promise.resolve();
+    if (xlsxLoading) return xlsxLoading;
+    xlsxLoading = new Promise(function(res, rej){
+      var sc = document.createElement('script'); sc.src = XLSX_URL;
+      sc.onload = res; sc.onerror = function(){ xlsxLoading = null; rej(new Error('Couldn’t load the Excel reader. Check your connection and try again.')); };
+      document.head.appendChild(sc);
+    });
+    return xlsxLoading;
+  }
+  var COLS = {
+    user: [/^buyer\s*user\s*name$/i, /^user\s*name$/i, /user\s*name/i, /handle/i, /^buyer$/i, /^customer$/i, /buyer(?!.*(address|phone|email|note))/i, /customer(?!.*(address|phone|email|note))/i, /^name$/i],
+    amount: [/^order\s*total/i, /^total$/i, /grand\s*total/i, /total\s*(paid|amount)/i, /amount\s*paid/i, /^amount$/i, /order\s*amount/i, /^paid$/i, /total/i, /subtotal/i, /^price$/i],
+    order: [/order\s*(id|number|no\.?|#)/i, /^order$/i, /transaction\s*id/i],
+    status: [/status/i]
+  };
+  function guessCol(headers, pats){
+    for (var i = 0; i < pats.length; i++) { var k = headers.findIndex(function(h){ return pats[i].test(h) && !/product|item|sku|seller|shop/i.test(h); }); if (k > -1) return k; }
+    return -1;
+  }
+  function toAmount(v){
+    if (typeof v === 'number') return v;
+    var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
+    var neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+    s = s.replace(/[^0-9.,]/g, '');
+    if (/,\d{2}$/.test(s) && s.indexOf('.') === -1) s = s.replace(',', '.'); else s = s.replace(/,/g, '');
+    var n = parseFloat(s); return neg ? -n : n;
+  }
+  function importedKey(){ return 'gr-imported-orders-' + S.activeId; }
+  function importedSet(){ try { return new Set(JSON.parse(localStorage.getItem(importedKey()) || '[]')); } catch (e) { return new Set(); } }
+  function rememberImported(ids){
+    var set = importedSet(); ids.forEach(function(i){ set.add(i); });
+    try { localStorage.setItem(importedKey(), JSON.stringify(Array.from(set).slice(-20000))); } catch (e) {}
+  }
+
+  function sheetRows(name){
+    var rows = XLSX.utils.sheet_to_json(IMP.wb.Sheets[name], { header: 1, raw: true, defval: '' });
+    var h = rows.findIndex(function(r){ return r.filter(function(c){ return String(c).trim() !== ''; }).length >= 2; });
+    if (h === -1) return { headers: [], rows: [] };
+    return { headers: rows[h].map(function(c, i){ return String(c).trim() || ('Column ' + (i + 1)); }), rows: rows.slice(h + 1) };
+  }
+  function pickSheet(name){
+    var d = sheetRows(name);
+    IMP.sheet = name; IMP.headers = d.headers; IMP.rows = d.rows;
+    IMP.cols = { user: guessCol(d.headers, COLS.user), amount: guessCol(d.headers, COLS.amount), order: guessCol(d.headers, COLS.order), status: guessCol(d.headers, COLS.status) };
+  }
+
+  function computeImport(){
+    var c = IMP.cols, perCents = Math.round(IMP.per * 100), seenOrders = new Set(), already = importedSet();
+    var by = new Map(), skip = { under: 0, missing: 0, cancelled: 0, dupe: 0, already: 0 }, orderIds = [], orders = 0;
+    IMP.rows.forEach(function(r){
+      if (r.every(function(x){ return String(x).trim() === ''; })) return;
+      var u = cleanName(c.user > -1 ? r[c.user] : ''), amt = c.amount > -1 ? toAmount(r[c.amount]) : NaN;
+      if (!u || !isFinite(amt)) { skip.missing++; return; }
+      if (c.status > -1 && /cancel|refund|void|return|fail|unpaid/i.test(String(r[c.status]))) { skip.cancelled++; return; }
+      if (amt <= 0) { skip.cancelled++; return; }
+      var oid = c.order > -1 ? String(r[c.order]).trim() : '';
+      if (oid) {
+        if (seenOrders.has(oid)) { skip.dupe++; return; }
+        seenOrders.add(oid);
+        if (already.has(oid)) { skip.already++; return; }
+        orderIds.push(oid);
+      }
+      orders++;
+      var cents = Math.round(amt * 100), key = u.toLowerCase();
+      var g = by.get(key) || { u: u, orders: 0, total: 0, entries: 0, oids: [] };
+      g.orders++; g.total += cents; if (oid) g.oids.push(oid);
+      if (IMP.mode === 'order') { var e = Math.floor(cents / perCents); if (!e) skip.under++; g.entries += e; }
+      by.set(key, g);
+    });
+    var list = Array.from(by.values());
+    if (IMP.mode === 'total') list.forEach(function(g){ g.entries = Math.floor(g.total / perCents); if (!g.entries) skip.under++; });
+    list.sort(function(a, b){ return b.entries - a.entries || b.total - a.total; });
+    return { list: list, skip: skip, orderIds: orderIds, orders: orders,
+      people: list.filter(function(g){ return g.entries > 0; }).length,
+      entries: list.reduce(function(s, g){ return s + g.entries; }, 0) };
+  }
+  function money(cents){ return '$' + (cents / 100).toFixed(2); }
+
+  function renderImport(){
+    var box = el('div', 'mbox wide');
+    box.appendChild(el('h3', null, 'Import orders'));
+    box.appendChild(el('p', 'meta', 'Upload an Excel or CSV export. Every $' + IMP.per + ' in an order earns 1 entry, so a $33.99 order gets 3.'));
+    var file = el('input', 'imp-file'); file.type = 'file'; file.accept = '.xlsx,.xls,.csv,.ods';
+    file.onchange = function(){ readImportFile(file.files[0]); };
+    box.appendChild(file);
+    if (IMP.error) box.appendChild(el('p', 'meta', IMP.error)).style.color = 'var(--danger)';
+
+    if (IMP.wb) {
+      box.appendChild(el('p', 'meta', IMP.fileName + (IMP.wb.SheetNames.length > 1 ? '' : ' · ' + IMP.rows.length + ' rows')));
+      var grid = el('div', 'imp-grid');
+      if (IMP.wb.SheetNames.length > 1) grid.appendChild(selectField('Sheet', IMP.wb.SheetNames.map(function(n){ return [n, n]; }), IMP.sheet, function(v){ pickSheet(v); renderImport(); }));
+      var opts = IMP.headers.map(function(h, i){ return [String(i), h]; });
+      grid.appendChild(selectField('Username column', [['-1', 'Choose…']].concat(opts), String(IMP.cols.user), function(v){ IMP.cols.user = +v; renderImport(); }));
+      grid.appendChild(selectField('Order total column', [['-1', 'Choose…']].concat(opts), String(IMP.cols.amount), function(v){ IMP.cols.amount = +v; renderImport(); }));
+      grid.appendChild(selectField('Order ID (optional)', [['-1', 'None']].concat(opts), String(IMP.cols.order), function(v){ IMP.cols.order = +v; renderImport(); }));
+      grid.appendChild(selectField('Status (optional)', [['-1', 'None']].concat(opts), String(IMP.cols.status), function(v){ IMP.cols.status = +v; renderImport(); }));
+      box.appendChild(grid);
+
+      var rule = el('div', 'imp-rule');
+      var perLbl = el('label'); perLbl.append('1 entry per $');
+      var per = el('input'); per.type = 'number'; per.min = '1'; per.step = '1'; per.value = IMP.per;
+      per.onchange = function(){ var v = Number(per.value); if (v >= 1) { IMP.per = v; try { localStorage.setItem('gr-import-per', v); } catch (e) {} } renderImport(); };
+      perLbl.appendChild(per); rule.appendChild(perLbl);
+      [['order', 'Each order separately'], ['total', 'Add up each person’s orders']].forEach(function(m){
+        var l = el('label'), r = el('input'); r.type = 'radio'; r.name = 'impmode'; r.checked = IMP.mode === m[0];
+        r.onchange = function(){ IMP.mode = m[0]; renderImport(); };
+        l.append(r, m[1]); rule.appendChild(l);
+      });
+      box.appendChild(rule);
+
+      var ready = IMP.cols.user > -1 && IMP.cols.amount > -1;
+      if (!ready) box.appendChild(el('p', 'meta', 'Pick the username and order total columns to see the entries.'));
+      else {
+        var R = computeImport(); IMP.result = R;
+        var sum = el('div', 'imp-sum');
+        sum.append(el('b', null, String(R.entries)), (R.entries === 1 ? ' entry' : ' entries') + ' for ', el('b', null, String(R.people)), (R.people === 1 ? ' username' : ' usernames') + ' from ' + R.orders + (R.orders === 1 ? ' order' : ' orders'));
+        var sk = [];
+        var pl = function(n, one, many){ return n + ' ' + (n === 1 ? one : many); };
+        if (R.skip.under) sk.push((IMP.mode === 'order' ? pl(R.skip.under, 'order', 'orders') : pl(R.skip.under, 'person', 'people')) + ' under $' + IMP.per);
+        if (R.skip.missing) sk.push(pl(R.skip.missing, 'row', 'rows') + ' missing a username or total');
+        if (R.skip.cancelled) sk.push(R.skip.cancelled + ' cancelled/refunded');
+        if (R.skip.dupe) sk.push(pl(R.skip.dupe, 'duplicate order ID', 'duplicate order IDs'));
+        if (R.skip.already) sk.push(pl(R.skip.already, 'order', 'orders') + ' already imported into this giveaway');
+        if (sk.length) sum.appendChild(el('div', 'imp-skip', 'Skipped: ' + sk.join(', ') + '.'));
+        if (IMP.cols.order === -1) sum.appendChild(el('div', 'imp-skip', 'Tip: pick an Order ID column so importing the same file twice can’t double anyone’s entries.'));
+        box.appendChild(sum);
+
+        var wrap = el('div', 'imp-scroll'), tbl = el('table', 'imp-table'), thead = el('tr');
+        [['Username', ''], ['Orders', 'n'], ['Spent', 'n'], ['Entries', 'n']].forEach(function(h){ thead.appendChild(el('th', h[1], h[0])); });
+        tbl.appendChild(thead);
+        R.list.slice(0, 300).forEach(function(g){
+          var tr = el('tr');
+          tr.append(el('td', null, '@' + g.u), el('td', 'n', String(g.orders)), el('td', 'n', money(g.total)), el('td', 'n' + (g.entries ? ' e' : ''), String(g.entries)));
+          tbl.appendChild(tr);
+        });
+        wrap.appendChild(tbl); box.appendChild(wrap);
+        if (R.list.length > 300) box.appendChild(el('p', 'meta', 'Showing the top 300 of ' + R.list.length + '. All of them will be added.'));
+      }
+    }
+
+    var acts = el('div', 'acts');
+    var go = el('button', 'btn gold', IMP.result && IMP.result.entries ? 'Add ' + IMP.result.entries + ' entries' : 'Add entries');
+    go.disabled = !(IMP.wb && IMP.result && IMP.result.entries && IMP.cols.user > -1 && IMP.cols.amount > -1);
+    go.onclick = function(){ commitImport(go); };
+    var cancel = el('button', 'btn ghost', 'Cancel'); cancel.dataset.close = '1';
+    acts.append(go, cancel); box.appendChild(acts);
+    openModal(box);
+  }
+  function selectField(label, options, value, onChange){
+    var l = el('label', null, label), sel = el('select');
+    options.forEach(function(o){ var op = el('option', null, o[1]); op.value = o[0]; sel.appendChild(op); });
+    sel.value = value; sel.onchange = function(){ onChange(sel.value); };
+    l.appendChild(sel); return l;
+  }
+  function readImportFile(f){
+    if (!f) return;
+    IMP.error = ''; IMP.result = null;
+    loadXlsx().then(function(){
+      return f.arrayBuffer();
+    }).then(function(buf){
+      var wb = XLSX.read(buf, { type: 'array' });
+      if (!wb.SheetNames.length) throw new Error('That file has no sheets.');
+      IMP.wb = wb; IMP.fileName = f.name;
+      var best = wb.SheetNames.find(function(n){ return sheetRows(n).rows.length; }) || wb.SheetNames[0];
+      pickSheet(best);
+      renderImport();
+    }).catch(function(e){ IMP.wb = null; IMP.error = e.message || 'Couldn’t read that file.'; renderImport(); });
+  }
+  function commitImport(btn){
+    var R = IMP.result, gid = S.activeId;
+    var groups = R.list.filter(function(g){ return g.entries > 0; });
+    var items = groups.map(function(g){ return { u: g.u, c: g.entries }; });
+    if (!items.length) return;
+    importing = true; btn.disabled = true;
+    var chunks = [], chunkGroups = [];
+    for (var i = 0; i < items.length; i += 40) { chunks.push(items.slice(i, i + 40)); chunkGroups.push(groups.slice(i, i + 40)); }
+    // Orders under the threshold earn nothing but are still marked imported so a re-upload can't count them later
+    var zeroOids = [].concat.apply([], R.list.filter(function(g){ return !g.entries; }).map(function(g){ return g.oids; }));
+    var done = 0, added = 0, last = null;
+    function next(){
+      if (done >= chunks.length) return finish();
+      btn.textContent = 'Adding… ' + Math.round(done / chunks.length * 100) + '%';
+      return api('addEntries', { giveawayId: gid, items: chunks[done] }).then(function(d){
+        rememberImported([].concat.apply([], chunkGroups[done].map(function(g){ return g.oids; })));
+        last = d; done++; added += chunks[done - 1].reduce(function(s, x){ return s + x.c; }, 0); return next();
+      });
+    }
+    function finish(){
+      importing = false;
+      rememberImported(zeroOids);
+      if (S.activeId === gid && last) { S.entries = last.entries; renderStage(); renderEntries(); resetReel(); }
+      closeModal();
+      toast('Added ' + added + ' entries for ' + items.length + ' usernames from ' + IMP.fileName);
+    }
+    next().catch(function(e){
+      importing = false;
+      if (last && S.activeId === gid) { S.entries = last.entries; renderStage(); renderEntries(); }
+      var msg = (done ? 'Stopped after adding ' + added + ' entries. ' : '') + (e.message || 'Import failed');
+      if (done && IMP.cols.order > -1) { renderImport(); msg += ' Click Add again to finish the rest.'; }
+      else if (done) { closeModal(); msg += ' No Order ID column, so check the list before re-importing.'; }
+      else { btn.disabled = false; btn.textContent = 'Try again'; }
+      fail(new Error(msg));
+    });
+  }
+  $('importBtn').onclick = function(){
+    if (!S.activeId) return;
+    var per = 10; try { per = Number(localStorage.getItem('gr-import-per')) || 10; } catch (e) {}
+    IMP = { per: per, mode: 'order', wb: null, result: null, error: '' };
+    renderImport();
+    loadXlsx().catch(function(){});
   };
 
   // ---------- Draw ----------
