@@ -18,3 +18,16 @@
   to = "/.netlify/functions/public"
   status = 200
   force = true
+
+# Customers land on the read-only view; the admin lives at /admin (still locked per device).
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/"
+  to = "/view.html"
+  status = 200
+  force = true

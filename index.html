@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Giveaway Runner</title>
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -153,7 +154,7 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
 <div class="wrap" id="lock" hidden>
   <form class="card lock" id="lockForm">
     <h2>Enter access key</h2>
-    <p class="hint" id="lockMsg">This is the ADMIN_KEY set in Netlify. It’s remembered on this device.</p>
+    <p class="hint" id="lockMsg">Enter the ADMIN_KEY from Netlify. You only do this once per device.</p>
     <input id="lockKey" type="password" autocomplete="current-password" placeholder="Access key">
     <button class="btn gold" type="submit">Unlock</button>
   </form>
@@ -167,6 +168,7 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
       <select id="gwSelect" aria-label="Choose giveaway"></select>
       <button class="btn" id="newBtn">New giveaway</button>
       <button class="btn ghost danger" id="delBtn">Delete</button>
+      <button class="btn ghost" id="signOutBtn" title="Sign this device out">Sign out</button>
     </div>
   </header>
 
@@ -249,7 +251,7 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var KEY_STORE = 'gr-admin-key', LAST_STORE = 'gr-last-giveaway';
+  var KEY_STORE = 'gr-admin-key', TOKEN_STORE = 'gr-device-token', LAST_STORE = 'gr-last-giveaway';
   var S = { giveaways: [], activeId: null, entries: [], prizes: [] };
   var drawing = false, pending = 0;
 
@@ -262,11 +264,11 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
     setBusy(1);
     return fetch('/api', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': read(KEY_STORE) || '' },
+      headers: { 'Content-Type': 'application/json', 'x-device-token': read(TOKEN_STORE) || '' },
       body: JSON.stringify(Object.assign({ op: op }, data || {}))
     }).then(function(res){
       return res.json().catch(function(){ return { error: 'Bad response from server (' + res.status + ')' }; }).then(function(out){
-        if (res.status === 401) { showLock('Wrong or missing access key.'); throw new Error('locked'); }
+        if (res.status === 401) { store(TOKEN_STORE, null); showLock(out.error || 'Sign in on this device.'); throw new Error('locked'); }
         if (!res.ok) throw new Error(out.error || ('Request failed (' + res.status + ')'));
         return out;
       });
@@ -280,8 +282,27 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
 
   // ---------- Lock ----------
   function showLock(msg){ $('main').hidden = true; $('lock').hidden = false; if (msg) $('lockMsg').textContent = msg; $('lockKey').focus(); }
+  function deviceName(){
+    var ua = navigator.userAgent;
+    var os = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Device';
+    var br = ua.indexOf('Edg/') > -1 ? 'Edge' : ua.indexOf('Chrome/') > -1 ? 'Chrome' : ua.indexOf('Firefox/') > -1 ? 'Firefox' : ua.indexOf('Safari/') > -1 ? 'Safari' : 'Browser';
+    return os + ' ' + br;
+  }
+  function login(key){
+    return fetch('/api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'login', key: key, device: deviceName() }) })
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ if (!r.ok) throw new Error(d.error || 'Sign-in failed'); return d.token; }); });
+  }
   $('lockForm').onsubmit = function(ev){
-    ev.preventDefault(); store(KEY_STORE, $('lockKey').value.trim()); $('lockKey').value = ''; boot();
+    ev.preventDefault();
+    var key = $('lockKey').value.trim(); if (!key) return;
+    var btn = this.querySelector('button'); btn.disabled = true; btn.textContent = 'Checking…';
+    login(key).then(function(token){
+      store(TOKEN_STORE, token); $('lockKey').value = ''; boot();
+    }).catch(function(e){ $('lockMsg').textContent = e.message; $('lockKey').select(); })
+      .finally(function(){ btn.disabled = false; btn.textContent = 'Unlock'; });
+  };
+  $('signOutBtn').onclick = function(){
+    confirmClick(this, 'Click again to sign out', function(){ store(TOKEN_STORE, null); showLock('Signed out. Enter the access key to use this device again.'); });
   };
 
   // ---------- Helpers ----------
@@ -391,6 +412,14 @@ details textarea{width:100%;margin:8px 0;resize:vertical}
     }).catch(fail);
   }
   function boot(){
+    // One-time migration: devices from the old version stored the key itself. Swap it for a device token.
+    var oldKey = read(KEY_STORE);
+    if (oldKey && !read(TOKEN_STORE)) {
+      store(KEY_STORE, null);
+      return login(oldKey).then(function(t){ store(TOKEN_STORE, t); boot(); }).catch(function(){ showLock('Sign in on this device.'); });
+    }
+    store(KEY_STORE, null);
+    if (!read(TOKEN_STORE)) return showLock();
     $('lock').hidden = true;
     api('listGiveaways').then(function(d){
       $('main').hidden = false;
