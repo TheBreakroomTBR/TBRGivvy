@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Giveaway Entries</title>
+<meta name="description" content="Check how many entries you have in each giveaway.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#110a1a;--panel:#1b1228;--panel2:#241836;--line:#36264c;--text:#f6f1fb;--muted:#a898bd;
+  --gold:#f0c23b;--goldbg:#e8b931;--goldink:#1a1024;--danger:#ff8a80;color-scheme:dark;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Saira Condensed","Arial Narrow","Roboto Condensed",sans-serif;font-size:18px;line-height:1.4}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{max-width:820px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:8px 0 16px}
+.brand{font-weight:800;font-size:26px;letter-spacing:.02em}
+.brand span{color:var(--gold)}
+select,input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+select{min-width:220px;font-weight:600}
+@media (max-width:520px){select{width:100%}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:22px;font-weight:700}
+.lookup{border-top:4px solid var(--goldbg);padding:20px 22px 22px}
+.lookup h1{margin:0 0 4px;font-size:clamp(26px,5vw,36px);font-weight:800;line-height:1.05}
+.lookup .sub{color:var(--muted);margin:0 0 14px}
+.search{display:flex;gap:8px}
+.search .at{position:relative;flex:1}
+.search .at::before{content:"@";position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:700}
+.search input{width:100%;padding-left:28px;font-size:20px}
+.btn{border:1px solid var(--goldbg);background:var(--goldbg);color:var(--goldink);border-radius:8px;padding:10px 20px;font-weight:800;cursor:pointer;font-size:18px}
+.result{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);min-height:20px}
+.result .big{font-size:clamp(56px,14vw,96px);font-weight:800;line-height:.95;color:var(--gold);font-variant-numeric:tabular-nums}
+.result .big small{font-size:.35em;color:var(--text);margin-left:6px}
+.result .facts{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:10px;color:var(--muted)}
+.result .facts b{color:var(--text);font-variant-numeric:tabular-nums}
+.result .none{color:var(--muted)}
+.win{margin-top:12px;background:var(--goldbg);color:var(--goldink);border-radius:8px;padding:10px 14px;font-weight:800;font-size:20px}
+.stats{display:flex;gap:28px;margin-bottom:4px}
+.stats div{display:flex;flex-direction:column}
+.stats b{font-size:30px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.stats span{color:var(--muted);font-size:15px}
+.prizes{list-style:none;margin:0;padding:0}
+.prizes li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line)}
+.prizes li:first-child{border-top:0}
+.prizes .pn{font-weight:700}
+.prizes .ps{color:var(--muted)}
+.prizes .ps b{color:var(--gold)}
+.filter{width:100%;margin-bottom:10px}
+.board{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.board li{display:grid;grid-template-columns:42px minmax(0,1fr) auto 64px;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line)}
+.board .rk{color:var(--muted);font-variant-numeric:tabular-nums}
+.board .u{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .c{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.board .o{color:var(--muted);font-size:15px;text-align:right;font-variant-numeric:tabular-nums}
+.board li.me{background:var(--panel2);border-left:3px solid var(--goldbg)}
+.board li.me .u{color:var(--gold)}
+.more{margin-top:10px;background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600}
+.empty{color:var(--muted);padding:14px 4px;text-align:center}
+.foot{color:var(--muted);font-size:14px;text-align:center;margin:4px 0 20px}
+.err{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Giveaway <span>Entries</span></div>
+    <select id="gwSelect" aria-label="Choose giveaway" hidden></select>
+  </header>
+
+  <p class="card err" id="error" hidden></p>
+
+  <section class="card lookup" id="lookup" hidden>
+    <h1 id="gwName"></h1>
+    <p class="sub">Type your username to see how many entries you have.</p>
+    <form class="search" id="searchForm">
+      <div class="at"><input id="who" placeholder="yourusername" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Your username"></div>
+      <button class="btn" type="submit">Check</button>
+    </form>
+    <div class="result" id="result" aria-live="polite" hidden></div>
+  </section>
+
+  <section class="card" id="prizeCard" hidden>
+    <h2>Prizes</h2>
+    <ul class="prizes" id="prizes"></ul>
+  </section>
+
+  <section class="card" id="boardCard" hidden>
+    <div class="stats">
+      <div><b id="statPeople">0</b><span>entrants</span></div>
+      <div><b id="statEntries">0</b><span>total entries</span></div>
+    </div>
+    <h2 style="margin-top:16px">Everyone’s entries</h2>
+    <input class="filter" id="filter" placeholder="Search usernames" aria-label="Search usernames">
+    <ul class="board" id="board"></ul>
+    <button class="more" id="more" hidden>Show everyone</button>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var WHO = 'gr-view-username', REFRESH_MS = 30000, PAGE = 50;
+  var S = { giveaways: [], gid: null, data: null, me: '', showAll: false, loadedAt: 0 };
+
+  function read(k){ try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function store(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+  function el(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function clean(u){ return String(u || '').trim().replace(/^@+/, '').trim(); }
+  function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+  function showError(msg){ var e = $('error'); e.textContent = msg; e.hidden = !msg; }
+
+  function get(qs){
+    return fetch('/public' + (qs || ''), { headers: { Accept: 'application/json' } }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(d){
+        if (!r.ok) throw new Error(d.error || 'Couldn’t load giveaways right now.');
+        return d;
+      });
+    });
+  }
+
+  // ---------- Render ----------
+  function total(){ return S.data.entries.reduce(function(s,e){ return s + e.c; }, 0); }
+  function renderResult(){
+    var box = $('result');
+    if (!S.me || !S.data) { box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = '';
+    var key = S.me.toLowerCase(), list = S.data.entries, t = total();
+    var idx = list.findIndex(function(e){ return e.u.toLowerCase() === key; });
+    var won = S.data.prizes.filter(function(p){ return p.winner && p.winner.toLowerCase() === key; });
+    if (idx === -1) {
+      box.appendChild(el('div', 'none', won.length ? '@' + S.me + ' has no entries left in the pool.' : 'No entries found for @' + S.me + ' in this giveaway yet. Check the spelling or ask on stream.'));
+    } else {
+      var e = list[idx];
+      var big = el('div', 'big', String(e.c)); big.appendChild(el('small', null, e.c === 1 ? 'entry' : 'entries')); box.appendChild(big);
+      var facts = el('div', 'facts');
+      function fact(label, val){ var s = el('span'); s.append(label + ' ', el('b', null, val)); facts.appendChild(s); }
+      fact('Chance per draw', t ? (e.c / t * 100).toFixed(1) + '%' : '0%');
+      fact('Rank', '#' + (list.filter(function(x){ return x.c > e.c; }).length + 1) + ' of ' + list.length);
+      fact('Total entries', String(t));
+      box.appendChild(facts);
+    }
+    won.forEach(function(p){ box.appendChild(el('div', 'win', '@' + S.me + ' won ' + p.name + '!')); });
+  }
+  function renderPrizes(){
+    var ul = $('prizes'); ul.innerHTML = '';
+    var ps = S.data.prizes;
+    $('prizeCard').hidden = !ps.length;
+    ps.slice().sort(function(a,b){ return (a.winner ? 1 : 0) - (b.winner ? 1 : 0); }).forEach(function(p){
+      var li = el('li'); li.appendChild(el('span', 'pn', p.name));
+      var s = el('span', 'ps');
+      if (p.winner) s.append('Won by ', el('b', null, '@' + p.winner)); else s.textContent = 'Still up for grabs';
+      li.appendChild(s); ul.appendChild(li);
+    });
+  }
+  function renderBoard(){
+    var list = S.data.entries, t = total(), q = clean($('filter').value).toLowerCase(), me = S.me.toLowerCase();
+    $('statPeople').textContent = list.length; $('statEntries').textContent = t;
+    var ul = $('board'); ul.innerHTML = '';
+    var rows = [];
+    list.forEach(function(e, i){ if (!q || e.u.toLowerCase().indexOf(q) !== -1) rows.push({ e: e, rank: list.filter(function(x){ return x.c > e.c; }).length + 1 }); });
+    var limit = (q || S.showAll) ? rows.length : PAGE;
+    rows.slice(0, limit).forEach(function(r){
+      var li = el('li', r.e.u.toLowerCase() === me ? 'me' : '');
+      li.append(el('span', 'rk', '#' + r.rank), el('span', 'u', '@' + r.e.u), el('span', 'c', String(r.e.c)), el('span', 'o', t ? (r.e.c / t * 100).toFixed(1) + '%' : ''));
+      li.querySelector('.u').title = '@' + r.e.u;
+      ul.appendChild(li);
+    });
+    if (!rows.length) ul.appendChild(el('li', 'empty', list.length ? 'No usernames match.' : 'No entries yet.')).style.display = 'block';
+    var more = $('more'); more.hidden = rows.length <= limit;
+    more.textContent = 'Show everyone (' + rows.length + ')';
+  }
+  function renderAll(){
+    if (!S.data) return;
+    $('gwName').textContent = S.data.giveaway.name;
+    document.title = S.data.giveaway.name + ' entries';
+    $('lookup').hidden = false; $('boardCard').hidden = false;
+    renderResult(); renderPrizes(); renderBoard(); tickFoot();
+  }
+  function tickFoot(){
+    if (!S.loadedAt) return;
+    var s = Math.round((Date.now() - S.loadedAt) / 1000);
+    $('foot').textContent = 'Updated ' + (s < 5 ? 'just now' : s + 's ago') + '. Refreshes automatically.';
+  }
+
+  // ---------- Data ----------
+  function setUrl(){
+    var p = new URLSearchParams(); if (S.gid) p.set('g', S.gid); if (S.me) p.set('u', S.me);
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+  }
+  function loadGiveaway(silent){
+    var gid = S.gid; if (!gid) return Promise.resolve();
+    return get('?g=' + encodeURIComponent(gid)).then(function(d){
+      if (S.gid !== gid) return;
+      S.data = d; S.loadedAt = Date.now(); showError(''); renderAll();
+    }).catch(function(e){ if (!silent || !S.data) showError(e.message); });
+  }
+  function init(){
+    var params = new URLSearchParams(location.search);
+    S.me = clean(params.get('u') || read(WHO)); $('who').value = S.me;
+    get('').then(function(d){
+      S.giveaways = d.giveaways || [];
+      if (!S.giveaways.length) { showError('No giveaways are running right now. Check back during the next stream.'); return; }
+      var sel = $('gwSelect'); sel.innerHTML = '';
+      S.giveaways.forEach(function(g){ var o = el('option', null, g.name); o.value = g.id; sel.appendChild(o); });
+      var want = params.get('g');
+      S.gid = S.giveaways.some(function(g){ return g.id === want; }) ? want : S.giveaways[0].id;
+      sel.value = S.gid; sel.hidden = S.giveaways.length < 2;
+      setUrl();
+      return loadGiveaway(false);
+    }).catch(function(e){ showError(e.message); });
+  }
+
+  $('gwSelect').onchange = function(){ S.gid = this.value; S.data = null; S.showAll = false; $('filter').value = ''; setUrl(); loadGiveaway(false); };
+  $('searchForm').onsubmit = function(ev){
+    ev.preventDefault();
+    S.me = clean($('who').value); store(WHO, S.me); setUrl();
+    if (S.data) { renderResult(); renderBoard(); }
+  };
+  $('filter').oninput = renderBoard;
+  $('more').onclick = function(){ S.showAll = true; renderBoard(); };
+
+  setInterval(function(){ if (!document.hidden) loadGiveaway(true); }, REFRESH_MS);
+  setInterval(tickFoot, 5000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden && Date.now() - S.loadedAt > REFRESH_MS) loadGiveaway(true); });
+
+  init();
+})();
+</script>
+</body>
+</html>

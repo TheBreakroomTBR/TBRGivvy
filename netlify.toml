@@ -11,3 +11,10 @@
   to = "/.netlify/functions/api"
   status = 200
   force = true
+
+# Public read-only data for view.html: GET /public and /public?g=recXXX
+[[redirects]]
+  from = "/public"
+  to = "/.netlify/functions/public"
+  status = 200
+  force = true
