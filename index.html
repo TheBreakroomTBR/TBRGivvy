@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Giveaway Runner</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<style>
+:root{
+  --bg:#110a1a;--panel:#1b1228;--panel2:#241836;--line:#36264c;--text:#f6f1fb;--muted:#a898bd;
+  --gold:#f0c23b;--goldbg:#e8b931;--goldink:#1a1024;--danger:#ff8a80;--ok:#7fd99a;color-scheme:dark;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Saira Condensed","Arial Narrow","Roboto Condensed",sans-serif;font-size:18px;line-height:1.4}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:8px 0 16px}
+.brand{font-weight:800;font-size:26px;letter-spacing:.02em}
+.brand span{color:var(--gold)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,input,textarea{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-width:0}
+select{min-width:200px}
+.scan{width:240px}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--gold)}
+.btn.gold{background:var(--goldbg);color:var(--goldink);border-color:var(--goldbg)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:5px 10px;font-size:16px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:24px;font-weight:700}
+.newform .grid{display:flex;flex-wrap:wrap;gap:10px}
+.newform input{flex:1 1 260px}
+.stage{border-top:4px solid var(--goldbg);padding:20px 24px 24px}
+.stage-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;align-items:flex-start}
+.stage h1{margin:0;font-size:clamp(26px,4vw,38px);font-weight:800;line-height:1.05}
+.stats{display:flex;gap:28px}
+.stats div{display:flex;flex-direction:column;align-items:flex-end}
+.stats b{font-size:34px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.stats span{color:var(--muted);font-size:15px}
+.for{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;color:var(--muted)}
+.for select{flex:1 1 260px;max-width:460px;color:var(--text);font-weight:600}
+.reel{min-height:clamp(120px,20vw,200px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;margin:16px 0;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:12px 0}
+.reel-label{font-size:16px;color:var(--muted);min-height:22px}
+.reel-name{font-size:clamp(40px,9vw,104px);font-weight:800;line-height:1;word-break:break-word}
+.reel.spinning .reel-name{color:var(--muted)}
+.reel.won .reel-name{color:var(--gold);animation:pop .5s ease-out}
+.reel.won .reel-label{color:var(--gold);font-weight:700}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.reel.won .reel-name{animation:none}}
+.draw-row{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:center}
+.btn.big{font-size:24px;padding:12px 40px;font-weight:800}
+.check{display:flex;gap:8px;align-items:center;color:var(--muted);cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--goldbg)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}
+@media (max-width:880px){.cols{grid-template-columns:1fr}}
+.add{display:flex;flex-wrap:wrap;gap:8px}
+.add .grow{flex:1 1 180px}
+.stepper{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.stepper button{border:0;background:var(--panel2);width:38px;cursor:pointer;font-size:20px;font-weight:700}
+.stepper button:hover{color:var(--gold)}
+.stepper input{border:0;border-radius:0;width:56px;text-align:center;font-weight:700;-moz-appearance:textfield;padding:8px 4px}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.hint{color:var(--muted);font-size:15px;margin:8px 0 0;min-height:21px}
+.hint.ok{color:var(--gold)}
+details{margin:10px 0 14px}
+summary{cursor:pointer;color:var(--muted);font-size:16px}
+details textarea{width:100%;margin:8px 0;resize:vertical}
+.filter{width:100%;margin-bottom:10px}
+.list{list-style:none;margin:0 0 12px;padding:0;max-height:560px;overflow:auto;border-top:1px solid var(--line)}
+.list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+.list .u{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .odds{color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.list .stepper button{width:30px;font-size:18px}
+.list .stepper input{width:48px;padding:4px}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:22px;line-height:1;padding:2px 6px}
+.x:hover{color:var(--danger)}
+.empty{color:var(--muted);padding:16px 2px;text-align:center;display:block!important}
+.prizes{list-style:none;margin:12px 0 0;padding:0}
+.prize{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+@media (max-width:480px){.prize{grid-template-columns:1fr}}
+.bc{background:#fff;border-radius:8px;padding:6px;display:flex;align-items:center;justify-content:center;cursor:zoom-in;min-height:70px}
+.bc img{max-width:100%;height:auto;display:block}
+.bc .err{color:#7a0000;font-size:14px;text-align:center}
+.pname{font-weight:700;font-size:20px;line-height:1.15}
+.psku{color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:14px;font-weight:700;padding:1px 9px;border-radius:999px;border:1px solid var(--line);margin-right:6px}
+.chip.Available{color:var(--muted)}
+.chip.Won{color:var(--goldink);background:var(--goldbg);border-color:var(--goldbg)}
+.chip.Shipped{color:var(--ok);border-color:var(--ok)}
+.pwin{margin:4px 0}
+.pwin b{color:var(--gold)}
+.pacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.modal{position:fixed;inset:0;background:rgba(10,5,16,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal.open{display:flex}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(560px,100%);max-height:90vh;overflow:auto}
+.mbox h3{margin:0 0 6px;font-size:28px;line-height:1.1}
+.mbox .bc{margin:14px 0;cursor:default;padding:14px}
+.mbox .meta{color:var(--muted);margin:0 0 4px}
+.mbox .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.big-code{background:#fff;border-radius:16px;padding:28px;max-width:94vw;text-align:center;color:#1a1024}
+.big-code img{max-width:86vw;max-height:60vh;height:auto}
+.big-code .cap{font-weight:800;font-size:clamp(22px,4vw,40px)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 18px;border-radius:10px;z-index:60;max-width:90vw;display:none}
+.toast.show{display:block}
+.toast.bad{border-color:var(--danger);color:var(--danger)}
+.busy{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;font-size:14px;color:var(--muted);display:none}
+.busy.on{display:block}
+.blank{text-align:center;padding:40px 16px}
+.blank p{color:var(--muted)}
+.lock{max-width:420px;margin:12vh auto;text-align:center}
+.lock input{width:100%;margin:12px 0}
+#printArea{display:none}
+@media print{
+  @page{margin:6mm}
+  body{background:#fff}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important;color:#000;text-align:center;font-family:"Saira Condensed","Arial Narrow",sans-serif}
+  #printArea .pl-name{font-size:20pt;font-weight:800;margin:0 0 4pt}
+  #printArea img{width:3.4in;max-width:100%}
+  #printArea .pl-sub{font-size:11pt;margin-top:2pt}
+}
+</style>
+</head>
+<body>
+<div class="busy" id="busy">Saving…</div>
+
+<div class="wrap" id="lock" hidden>
+  <form class="card lock" id="lockForm">
+    <h2>Enter access key</h2>
+    <p class="hint" id="lockMsg">This is the ADMIN_KEY set in Netlify. It’s remembered on this device.</p>
+    <input id="lockKey" type="password" autocomplete="current-password" placeholder="Access key">
+    <button class="btn gold" type="submit">Unlock</button>
+  </form>
+</div>
+
+<div class="wrap" id="main" hidden>
+  <header>
+    <div class="brand">Giveaway <span>Runner</span></div>
+    <div class="bar">
+      <form id="scanForm"><input class="scan" id="scanInput" placeholder="Scan prize barcode" autocomplete="off" aria-label="Scan prize barcode"></form>
+      <select id="gwSelect" aria-label="Choose giveaway"></select>
+      <button class="btn" id="newBtn">New giveaway</button>
+      <button class="btn ghost danger" id="delBtn">Delete</button>
+    </div>
+  </header>
+
+  <form class="card newform" id="newForm" hidden>
+    <div class="grid">
+      <input id="nName" placeholder="Giveaway name, e.g. Friday night helmet giveaway" required>
+      <button class="btn gold" type="submit">Create giveaway</button>
+      <button class="btn ghost" type="button" id="cancelNew">Cancel</button>
+    </div>
+  </form>
+
+  <div id="app" hidden>
+    <section class="card stage">
+      <div class="stage-top">
+        <h1 id="gwName"></h1>
+        <div class="stats">
+          <div><b id="statPeople">0</b><span>entrants</span></div>
+          <div><b id="statEntries">0</b><span>entries</span></div>
+        </div>
+      </div>
+      <label class="for">Drawing for <select id="drawFor"></select></label>
+      <div class="reel" id="reel" aria-live="polite">
+        <div class="reel-label" id="reelLabel"></div>
+        <div class="reel-name" id="reelName">Ready to draw</div>
+      </div>
+      <div class="draw-row">
+        <button class="btn gold big" id="drawBtn">Draw winner</button>
+        <label class="check"><input type="checkbox" id="removeWinner" checked> Remove winner from pool after draw</label>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="card">
+        <h2>Entries</h2>
+        <form class="add" id="addForm">
+          <input class="grow" id="uName" placeholder="Username" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Username">
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Fewer entries">−</button>
+            <input id="uCount" type="number" min="1" value="1" inputmode="numeric" aria-label="Entries">
+            <button type="button" data-step="1" aria-label="More entries">+</button>
+          </div>
+          <button class="btn gold" type="submit">Add</button>
+        </form>
+        <p class="hint" id="addMsg">Adding a username that’s already in adds to their entries.</p>
+        <details>
+          <summary>Add a list at once</summary>
+          <textarea id="bulk" rows="5" placeholder="One per line, entries optional:&#10;jerseyking22, 3&#10;@helmethunter&#10;cardflipper 2"></textarea>
+          <button class="btn" type="button" id="bulkBtn">Add list</button>
+        </details>
+        <input class="filter" id="filter" placeholder="Find a username" aria-label="Find a username">
+        <ul class="list" id="list"></ul>
+        <button class="btn ghost danger" id="clearEntries">Clear all entries</button>
+      </section>
+
+      <section class="card">
+        <h2>Prizes</h2>
+        <form class="add" id="prizeForm">
+          <input class="grow" id="pName" placeholder="Prize, e.g. Signed mini helmet" required aria-label="Prize name">
+          <input id="pSku" placeholder="Barcode (optional)" autocomplete="off" aria-label="Barcode" style="flex:1 1 150px">
+          <button class="btn gold" type="submit">Add prize</button>
+        </form>
+        <p class="hint">Leave the barcode blank to generate one, or scan the item’s existing barcode into it.</p>
+        <ul class="prizes" id="prizes"></ul>
+      </section>
+    </div>
+  </div>
+
+  <section class="card blank" id="blank" hidden>
+    <h1>No giveaways yet</h1>
+    <p>Create one to start adding prizes and entries.</p>
+    <button class="btn gold big" id="blankNew">New giveaway</button>
+  </section>
+</div>
+
+<div class="modal" id="modal"></div>
+<div class="toast" id="toast" role="status"></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var KEY_STORE = 'gr-admin-key', LAST_STORE = 'gr-last-giveaway';
+  var S = { giveaways: [], activeId: null, entries: [], prizes: [] };
+  var drawing = false, pending = 0;
+
+  function store(k, v){ try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function read(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  // ---------- API ----------
+  function setBusy(d){ pending += d; $('busy').classList.toggle('on', pending > 0); }
+  function api(op, data){
+    setBusy(1);
+    return fetch('/api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': read(KEY_STORE) || '' },
+      body: JSON.stringify(Object.assign({ op: op }, data || {}))
+    }).then(function(res){
+      return res.json().catch(function(){ return { error: 'Bad response from server (' + res.status + ')' }; }).then(function(out){
+        if (res.status === 401) { showLock('Wrong or missing access key.'); throw new Error('locked'); }
+        if (!res.ok) throw new Error(out.error || ('Request failed (' + res.status + ')'));
+        return out;
+      });
+    }).finally(function(){ setBusy(-1); });
+  }
+  function fail(e){ if (e && e.message !== 'locked') toast(e.message || 'Something went wrong', true); }
+  function toast(msg, bad){
+    var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+    clearTimeout(t._t); t._t = setTimeout(function(){ t.className = 'toast'; }, bad ? 5000 : 2500);
+  }
+
+  // ---------- Lock ----------
+  function showLock(msg){ $('main').hidden = true; $('lock').hidden = false; if (msg) $('lockMsg').textContent = msg; $('lockKey').focus(); }
+  $('lockForm').onsubmit = function(ev){
+    ev.preventDefault(); store(KEY_STORE, $('lockKey').value.trim()); $('lockKey').value = ''; boot();
+  };
+
+  // ---------- Helpers ----------
+  function cleanName(u){ return String(u || '').trim().replace(/^@+/, '').trim(); }
+  function cleanCount(c){ var n = Math.floor(Number(c)); return n >= 1 ? n : 1; }
+  function totalEntries(){ return S.entries.reduce(function(s,e){ return s + e.c; }, 0); }
+  function active(){ return S.giveaways.find(function(g){ return g.id === S.activeId; }) || null; }
+  function el(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function confirmClick(btn, label, fn){
+    if (btn.dataset.armed) { clearTimeout(btn._t); btn.textContent = btn.dataset.orig; delete btn.dataset.armed; fn(); return; }
+    btn.dataset.armed = '1'; btn.dataset.orig = btn.textContent; btn.textContent = label;
+    btn._t = setTimeout(function(){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; }, 3000);
+  }
+  function barcodeImg(text, big){
+    try {
+      if (!window.JsBarcode) throw new Error('lib');
+      var c = document.createElement('canvas');
+      JsBarcode(c, text, { format: 'CODE128', width: big ? 4 : 2, height: big ? 160 : 70, margin: 8, background: '#ffffff', lineColor: '#000000', displayValue: true, fontSize: big ? 26 : 16, font: 'Saira Condensed' });
+      var img = new Image(); img.src = c.toDataURL('image/png'); img.alt = 'Barcode ' + text; return img;
+    } catch (e) {
+      return el('div', 'err', e.message === 'lib' ? 'Barcode library didn’t load. Reload the page.' : 'Can’t encode “' + text + '” as a barcode.');
+    }
+  }
+  function fmtTime(iso){ if (!iso) return ''; var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+
+  // ---------- Render ----------
+  function renderShell(){
+    var sel = $('gwSelect'); sel.innerHTML = '';
+    S.giveaways.forEach(function(g){ var o = el('option', null, g.name); o.value = g.id; sel.appendChild(o); });
+    sel.value = S.activeId || '';
+    var has = S.giveaways.length > 0;
+    sel.hidden = !has; $('delBtn').hidden = !has; $('app').hidden = !has; $('blank').hidden = has;
+  }
+  function availablePrizes(){ return S.prizes.filter(function(p){ return p.status === 'Available'; }); }
+  function renderStage(){
+    var g = active(); if (!g) return;
+    $('gwName').textContent = g.name;
+    $('statPeople').textContent = S.entries.length;
+    $('statEntries').textContent = totalEntries();
+    var sel = $('drawFor'), prev = sel.value; sel.innerHTML = '';
+    var av = availablePrizes();
+    if (!av.length) { var o = el('option', null, S.prizes.length ? 'All prizes have winners' : 'Add a prize first'); o.value = ''; sel.appendChild(o); }
+    av.forEach(function(p){ var o = el('option', null, p.name + '  (' + p.sku + ')'); o.value = p.id; sel.appendChild(o); });
+    if (av.some(function(p){ return p.id === prev; })) sel.value = prev;
+    sel.disabled = drawing || !av.length;
+    $('drawBtn').disabled = drawing || !av.length || !S.entries.length;
+  }
+  function resetReel(){
+    if (drawing) return;
+    $('reel').className = 'reel'; $('reelLabel').textContent = '';
+    $('reelName').textContent = !S.entries.length ? 'Add entries to draw' : !availablePrizes().length ? 'Add a prize to draw' : 'Ready to draw';
+  }
+  function renderEntries(){
+    var list = $('list'); list.innerHTML = '';
+    var q = cleanName($('filter').value).toLowerCase(), total = totalEntries(), shown = 0;
+    S.entries.forEach(function(e){
+      if (q && e.u.toLowerCase().indexOf(q) === -1) return;
+      shown++;
+      var li = el('li'); li.dataset.id = e.id;
+      var name = el('span', 'u', '@' + e.u); name.title = '@' + e.u;
+      var odds = el('span', 'odds', total ? (e.c / total * 100).toFixed(1) + '%' : '');
+      var st = el('div', 'stepper');
+      var minus = el('button', null, '−'); minus.type = 'button'; minus.dataset.act = 'dec'; minus.setAttribute('aria-label', 'Fewer entries for ' + e.u);
+      var inp = el('input'); inp.type = 'number'; inp.min = '1'; inp.value = e.c; inp.dataset.act = 'set'; inp.setAttribute('aria-label', 'Entries for ' + e.u);
+      var plus = el('button', null, '+'); plus.type = 'button'; plus.dataset.act = 'inc'; plus.setAttribute('aria-label', 'More entries for ' + e.u);
+      st.append(minus, inp, plus);
+      var x = el('button', 'x', '×'); x.type = 'button'; x.dataset.act = 'del'; x.setAttribute('aria-label', 'Remove ' + e.u);
+      li.append(name, odds, st, x); list.appendChild(li);
+    });
+    if (!shown) list.appendChild(el('li', 'empty', S.entries.length ? 'No usernames match.' : 'No entries yet. Add a username above.'));
+  }
+  function renderPrizes(){
+    var ul = $('prizes'); ul.innerHTML = '';
+    if (!S.prizes.length) { ul.appendChild(el('li', 'empty', 'No prizes yet. Each prize gets its own barcode label.')); return; }
+    var order = { Available: 0, Won: 1, Shipped: 2 };
+    S.prizes.slice().sort(function(a,b){ return order[a.status] - order[b.status]; }).forEach(function(p){
+      var li = el('li', 'prize'); li.dataset.id = p.id;
+      var bc = el('div', 'bc'); bc.dataset.act = 'zoom'; bc.title = 'Show full screen'; bc.appendChild(barcodeImg(p.sku, false));
+      var info = el('div');
+      info.appendChild(el('div', 'pname', p.name));
+      var meta = el('div'); meta.append(el('span', 'chip ' + p.status, p.status), el('span', 'psku', p.sku)); info.appendChild(meta);
+      if (p.winner) {
+        var w = el('div', 'pwin'); w.append('Winner ', el('b', null, '@' + p.winner));
+        w.append(' with ' + p.winnerEntries + (p.winnerEntries === 1 ? ' entry' : ' entries') + (p.wonAt ? ', ' + fmtTime(p.wonAt) : ''));
+        info.appendChild(w);
+      }
+      var acts = el('div', 'pacts');
+      acts.appendChild(actBtn('Print label', 'print'));
+      if (p.status === 'Won') acts.appendChild(actBtn('Mark shipped', 'ship'));
+      if (p.status !== 'Available') acts.appendChild(actBtn('Clear winner', 'reopen'));
+      var del = actBtn('Delete', 'delp'); del.classList.add('ghost', 'danger'); acts.appendChild(del);
+      info.appendChild(acts);
+      li.append(bc, info); ul.appendChild(li);
+    });
+  }
+  function actBtn(label, act){ var b = el('button', 'btn sm', label); b.type = 'button'; b.dataset.act = act; return b; }
+  function renderAll(){ renderShell(); if (active()) { renderStage(); renderEntries(); renderPrizes(); } }
+
+  // ---------- Loading ----------
+  function selectGiveaway(id){
+    S.activeId = id; store(LAST_STORE, id); S.entries = []; S.prizes = [];
+    $('filter').value = ''; renderAll(); $('reelName').textContent = 'Loading…';
+    if (!id) return Promise.resolve();
+    return api('loadGiveaway', { id: id }).then(function(d){
+      if (S.activeId !== id) return;
+      S.entries = d.entries; S.prizes = d.prizes; renderAll(); resetReel();
+    }).catch(fail);
+  }
+  function boot(){
+    $('lock').hidden = true;
+    api('listGiveaways').then(function(d){
+      $('main').hidden = false;
+      S.giveaways = d.giveaways;
+      var last = read(LAST_STORE);
+      var id = S.giveaways.some(function(g){ return g.id === last; }) ? last : (S.giveaways[0] ? S.giveaways[0].id : null);
+      return selectGiveaway(id);
+    }).catch(function(e){ if (e.message !== 'locked') { $('main').hidden = false; renderAll(); fail(e); } });
+  }
+
+  // ---------- Giveaways ----------
+  function openNew(){ $('newForm').hidden = false; $('nName').focus(); }
+  $('newBtn').onclick = openNew; $('blankNew').onclick = openNew;
+  $('cancelNew').onclick = function(){ $('newForm').hidden = true; $('newForm').reset(); };
+  $('newForm').onsubmit = function(ev){
+    ev.preventDefault();
+    var name = $('nName').value.trim(); if (!name) return;
+    api('createGiveaway', { name: name }).then(function(d){
+      S.giveaways.unshift(d.giveaway); $('newForm').reset(); $('newForm').hidden = true;
+      return selectGiveaway(d.giveaway.id);
+    }).then(function(){ $('pName').focus(); }).catch(fail);
+  };
+  $('gwSelect').onchange = function(){ selectGiveaway(this.value); };
+  $('delBtn').onclick = function(){
+    var g = active(); if (!g) return;
+    confirmClick(this, 'Click again to delete', function(){
+      api('deleteGiveaway', { id: g.id }).then(function(){
+        S.giveaways = S.giveaways.filter(function(x){ return x.id !== g.id; });
+        toast('Deleted ' + g.name + '. Its prizes are still scannable.');
+        selectGiveaway(S.giveaways[0] ? S.giveaways[0].id : null);
+      }).catch(fail);
+    });
+  };
+
+  // ---------- Entries ----------
+  $('addForm').addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-step]'); if (!b) return;
+    $('uCount').value = Math.max(1, cleanCount($('uCount').value) + Number(b.dataset.step));
+  });
+  function flash(msg){ var m = $('addMsg'); m.textContent = msg; m.classList.add('ok'); clearTimeout(m._t); m._t = setTimeout(function(){ m.classList.remove('ok'); }, 2500); }
+  function sendEntries(items, done){
+    var gid = S.activeId;
+    return api('addEntries', { giveawayId: gid, items: items }).then(function(d){
+      if (S.activeId !== gid) return;
+      S.entries = d.entries; renderStage(); renderEntries(); resetReel(); done(d.results);
+    }).catch(fail);
+  }
+  $('addForm').onsubmit = function(ev){
+    ev.preventDefault();
+    var u = cleanName($('uName').value), c = cleanCount($('uCount').value);
+    if (!u) { $('addMsg').textContent = 'Enter a username first.'; $('uName').focus(); return; }
+    $('uName').value = ''; $('uCount').value = 1; $('uName').focus();
+    sendEntries([{ u: u, c: c }], function(r){
+      r = r[0]; if (!r) return;
+      flash(r.existing ? '@' + r.u + ' now has ' + r.c + ' entries (+' + r.added + ').' : 'Added @' + r.u + ' with ' + r.c + (r.c === 1 ? ' entry.' : ' entries.'));
+    });
+  };
+  $('bulkBtn').onclick = function(){
+    var items = [];
+    $('bulk').value.split(/\r?\n/).forEach(function(line){
+      line = line.trim(); if (!line) return;
+      var m = line.match(/^(.*?)[\s,;:\t]+(\d+)\s*$/);
+      items.push(m ? { u: m[1], c: m[2] } : { u: line, c: 1 });
+    });
+    if (!items.length) { $('addMsg').textContent = 'Paste at least one username.'; return; }
+    sendEntries(items, function(r){
+      $('bulk').value = '';
+      var n = r.reduce(function(s,x){ return s + x.added; }, 0);
+      flash('Added ' + n + (n === 1 ? ' entry' : ' entries') + ' across ' + r.length + (r.length === 1 ? ' line.' : ' lines.'));
+    });
+  };
+  $('filter').oninput = renderEntries;
+  var countTimers = {};
+  function queueCount(e){
+    clearTimeout(countTimers[e.id]);
+    countTimers[e.id] = setTimeout(function(){ api('setCount', { id: e.id, c: e.c }).catch(fail); }, 450);
+  }
+  $('list').addEventListener('click', function(ev){
+    var t = ev.target.closest('[data-act]'); if (!t || t.dataset.act === 'set') return;
+    var id = t.closest('li').dataset.id, e = S.entries.find(function(x){ return x.id === id; }); if (!e) return;
+    if (t.dataset.act === 'inc') { e.c++; queueCount(e); }
+    else if (t.dataset.act === 'dec') { if (e.c <= 1) return; e.c--; queueCount(e); }
+    else if (t.dataset.act === 'del') {
+      clearTimeout(countTimers[id]);
+      S.entries = S.entries.filter(function(x){ return x.id !== id; });
+      api('deleteEntry', { id: id }).catch(fail);
+    }
+    renderStage(); renderEntries(); resetReel();
+  });
+  $('list').addEventListener('change', function(ev){
+    var t = ev.target; if (t.dataset.act !== 'set') return;
+    var id = t.closest('li').dataset.id, e = S.entries.find(function(x){ return x.id === id; }); if (!e) return;
+    e.c = cleanCount(t.value); queueCount(e); renderStage(); renderEntries();
+  });
+  $('clearEntries').onclick = function(){
+    if (!S.entries.length) return;
+    var gid = S.activeId;
+    confirmClick(this, 'Click again to clear all', function(){
+      api('clearEntries', { giveawayId: gid }).then(function(){ if (S.activeId === gid) { S.entries = []; renderStage(); renderEntries(); resetReel(); } }).catch(fail);
+    });
+  };
+
+  // ---------- Prizes ----------
+  $('prizeForm').onsubmit = function(ev){
+    ev.preventDefault();
+    var name = $('pName').value.trim(), sku = $('pSku').value.trim(), gid = S.activeId;
+    if (!name) return;
+    api('createPrize', { giveawayId: gid, name: name, sku: sku }).then(function(d){
+      if (S.activeId !== gid) return;
+      S.prizes.push(d.prize); $('prizeForm').reset(); $('pName').focus();
+      renderStage(); renderPrizes(); resetReel(); toast('Added ' + d.prize.name + ' (' + d.prize.sku + ')');
+    }).catch(fail);
+  };
+  // A scanner hitting Enter in the barcode box shouldn't submit before a name is typed
+  $('pSku').addEventListener('keydown', function(ev){ if (ev.key === 'Enter' && !$('pName').value.trim()) { ev.preventDefault(); $('pName').focus(); } });
+
+  function replacePrize(p){ S.prizes = S.prizes.map(function(x){ return x.id === p.id ? p : x; }); renderStage(); renderPrizes(); resetReel(); }
+  function prizeAction(act, p, btn){
+    if (act === 'zoom') return showBig(p);
+    if (act === 'print') return printLabel(p, active() ? active().name : '');
+    if (act === 'ship') return api('setPrizeStatus', { id: p.id, status: 'Shipped' }).then(function(d){ replacePrize(d.prize); toast(p.name + ' marked shipped'); return d.prize; }).catch(fail);
+    if (act === 'reopen') return confirmClick(btn, 'Click again to clear', function(){
+      api('setPrizeStatus', { id: p.id, status: 'Available' }).then(function(d){ replacePrize(d.prize); toast(p.name + ' is available to draw again'); }).catch(fail);
+    });
+    if (act === 'delp') return confirmClick(btn, 'Click again to delete', function(){
+      api('deletePrize', { id: p.id }).then(function(){ S.prizes = S.prizes.filter(function(x){ return x.id !== p.id; }); renderStage(); renderPrizes(); resetReel(); }).catch(fail);
+    });
+  }
+  $('prizes').addEventListener('click', function(ev){
+    var t = ev.target.closest('[data-act]'); if (!t) return;
+    var id = t.closest('li').dataset.id, p = S.prizes.find(function(x){ return x.id === id; }); if (p) prizeAction(t.dataset.act, p, t);
+  });
+
+  function printLabel(p, gname){
+    var a = $('printArea'); a.innerHTML = '';
+    a.append(el('div', 'pl-name', p.name), barcodeImg(p.sku, true));
+    if (gname) a.appendChild(el('div', 'pl-sub', gname));
+    setTimeout(function(){ window.print(); }, 50);
+  }
+
+  // ---------- Modal ----------
+  function openModal(node){ var m = $('modal'); m.innerHTML = ''; m.appendChild(node); m.classList.add('open'); }
+  function closeModal(){ $('modal').classList.remove('open'); $('modal').innerHTML = ''; }
+  $('modal').addEventListener('click', function(ev){ if (ev.target === this || ev.target.closest('[data-close]')) closeModal(); });
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeModal(); });
+  function showBig(p){
+    var box = el('div', 'big-code'); box.dataset.close = '1';
+    box.append(barcodeImg(p.sku, true), el('div', 'cap', p.name));
+    openModal(box);
+  }
+
+  // ---------- Scan lookup ----------
+  $('scanForm').onsubmit = function(ev){
+    ev.preventDefault();
+    var sku = $('scanInput').value.trim(); if (!sku) return;
+    api('findPrize', { sku: sku }).then(function(d){
+      $('scanInput').value = '';
+      var box = el('div', 'mbox');
+      if (!d.prize) {
+        box.append(el('h3', null, 'No prize found'), el('p', 'meta', 'Nothing has barcode ' + sku + '.'));
+        var c = el('button', 'btn', 'Close'); c.dataset.close = '1'; var row = el('div', 'acts'); row.appendChild(c); box.appendChild(row);
+        return openModal(box);
+      }
+      var p = d.prize;
+      function draw(){
+        box.innerHTML = '';
+        box.appendChild(el('h3', null, p.name));
+        var meta = el('p', 'meta'); meta.append(el('span', 'chip ' + p.status, p.status), p.sku); box.appendChild(meta);
+        box.appendChild(el('p', 'meta', d.giveawayName ? 'Giveaway: ' + d.giveawayName : 'Not assigned to a giveaway'));
+        if (p.winner) {
+          var w = el('p', 'pwin'); w.append('Winner ', el('b', null, '@' + p.winner), ' with ' + p.winnerEntries + (p.winnerEntries === 1 ? ' entry' : ' entries') + (p.wonAt ? ', ' + fmtTime(p.wonAt) : ''));
+          box.appendChild(w);
+        }
+        var bc = el('div', 'bc'); bc.appendChild(barcodeImg(p.sku, false)); box.appendChild(bc);
+        var acts = el('div', 'acts');
+        var pr = el('button', 'btn', 'Print label'); pr.onclick = function(){ printLabel(p, d.giveawayName); }; acts.appendChild(pr);
+        if (p.status === 'Won') {
+          var sh = el('button', 'btn gold', 'Mark shipped');
+          sh.onclick = function(){ api('setPrizeStatus', { id: p.id, status: 'Shipped' }).then(function(r){ p = r.prize; if (S.prizes.some(function(x){ return x.id === p.id; })) replacePrize(p); draw(); toast('Marked shipped'); }).catch(fail); };
+          acts.appendChild(sh);
+        }
+        var c = el('button', 'btn ghost', 'Close'); c.dataset.close = '1'; acts.appendChild(c);
+        box.appendChild(acts);
+      }
+      draw(); openModal(box);
+    }).catch(fail);
+  };
+
+  // ---------- Draw ----------
+  function weightedLocal(){
+    var total = totalEntries(), r = Math.floor(Math.random() * total);
+    for (var i = 0; i < S.entries.length; i++) { if (r < S.entries[i].c) return S.entries[i]; r -= S.entries[i].c; }
+    return S.entries[0];
+  }
+  $('drawBtn').onclick = function(){
+    var prizeId = $('drawFor').value, gid = S.activeId;
+    var prize = S.prizes.find(function(p){ return p.id === prizeId; });
+    if (!prize || !S.entries.length || drawing) return;
+    drawing = true; renderStage();
+    var reel = $('reel'), nameEl = $('reelName'), label = $('reelLabel');
+    reel.className = 'reel spinning'; label.textContent = 'Drawing for ' + prize.name;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var steps = reduce ? 0 : 32, i = 0, result = null, error = null, animDone = false, finished = false;
+
+    api('draw', { giveawayId: gid, prizeId: prizeId, removeWinner: $('removeWinner').checked })
+      .then(function(d){ result = d; maybeFinish(); })
+      .catch(function(e){ error = e; maybeFinish(); });
+
+    function maybeFinish(){
+      if (!animDone && !error) return;
+      if (!result && !error) return;
+      if (finished) return; finished = true;
+      drawing = false;
+      if (error) { reel.className = 'reel'; label.textContent = ''; nameEl.textContent = 'Draw failed'; renderStage(); return fail(error); }
+      if (S.activeId !== gid) return;
+      S.entries = result.entries; replacePrize(result.prize);
+      reel.className = 'reel won';
+      nameEl.textContent = '@' + result.winner.u;
+      label.textContent = 'Wins ' + result.prize.name + ' with ' + result.winner.c + ' of ' + result.totalEntries + ' entries';
+      renderEntries();
+    }
+    function tick(){
+      if (i >= steps && result) { animDone = true; return maybeFinish(); }
+      if (error || finished) return maybeFinish();
+      if (S.entries.length) nameEl.textContent = '@' + weightedLocal().u;
+      var t = Math.min(i / Math.max(steps, 1), 1); i++;
+      setTimeout(tick, 45 + Math.pow(t, 3) * 330);
+    }
+    tick();
+  };
+
+  boot();
+})();
+</script>
+</body>
+</html>
